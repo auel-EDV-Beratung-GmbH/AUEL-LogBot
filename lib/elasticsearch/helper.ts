@@ -25,13 +25,6 @@ export const createUserElasticSearchPrompt = (elasticsearchResults: string, dbRe
   10. Only provide information that is directly supported by either data source
 `;
 
-export const getElasticsearchResults = async (query: string) => {
-  return fetch('/api/elasticsearch', {
-    method: 'POST',
-    body: query,
-  });
-};
-
 export const generateQuery = (message: string) => `
     You are an expert in generating optimized Elasticsearch queries. Your task is as follows:
     1. Generate an Elasticsearch query that retrieves the most relevant documents based on the user's message: "${message}".
@@ -120,8 +113,12 @@ export async function generateElasticsearchPrompt(message: string): Promise<Elas
 }
 
 export async function fetchFromElasticsearch(query: ElasticsearchQuery): Promise<any> {
-  console.log('fetching from elasticsearch with query:', JSON.stringify(query));
-  const response = await fetch('http://localhost:9200/logs-*/_search', {
+  const elasticsearchUrl = process.env.ELASTICSEARCH_URL;
+  if (elasticsearchUrl == null) {
+    throw new Error('ELASTICSEARCH_URL is not defined. You have to define a ELASTICSEARCH_URL in you .env');
+  }
+
+  const response = await fetch(elasticsearchUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

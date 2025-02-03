@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { atlasdb } from './connector';
 import { sql } from 'drizzle-orm';
 
-export async function generateMySQLPrompt(prompt: string) {
+export async function generateMysqlQuery(prompt: string) {
   const query = `
     You are an expert MySQL query generator. Your task is to:
     1. ou are a SQL (postgres) and data visualization expert. Your job is to help the user write a SQL query to retrieve the data they need. 

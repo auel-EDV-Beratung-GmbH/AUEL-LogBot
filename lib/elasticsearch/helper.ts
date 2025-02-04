@@ -122,8 +122,12 @@ export async function generateElasticsearchQuery(message: string): Promise<Elast
 }
 
 export async function fetchFromElasticsearch(query: ElasticsearchQuery): Promise<any> {
-  console.log('fetching from elasticsearch with query:', JSON.stringify(query));
-  const response = await fetch('http://localhost:9200/logs-*/_search', {
+  const elasticsearchUrl = process.env.ELASTICSEARCH_URL;
+  if (elasticsearchUrl == null) {
+    throw new Error('ELASTICSEARCH_URL is not defined. You have to define a ELASTICSEARCH_URL in you .env');
+  }
+
+  const response = await fetch(elasticsearchUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

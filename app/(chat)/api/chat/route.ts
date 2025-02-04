@@ -20,9 +20,9 @@ import { generateTitleFromUserMessage } from '../../actions';
 import {
   createUserElasticSearchPrompt,
   fetchFromElasticsearch,
-  generateElasticsearchPrompt,
+  generateElasticsearchQuery,
 } from '@/lib/elasticsearch/helper';
-import { generateMySQLPrompt, runGenerateSQLQuery } from '@/lib/atlasdb/natural-language-to-mysql';
+import { generateMysqlQuery, runGenerateSQLQuery } from '@/lib/atlasdb/natural-language-to-mysql';
 
 export const maxDuration = 60;
 
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
   // FIXME: THIS IS EXPERIMENTAL CODE
   // elasticsearch
   try {
-    const optimizedQuery = await generateElasticsearchPrompt(userMessage.content.toString());
+    const optimizedQuery = await generateElasticsearchQuery(userMessage.content.toString());
     if (!optimizedQuery) {
       return new Response('Failed to generate Elasticsearch prompt', { status: 500 });
     }
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   const databaseSearchEnabled = process.env.ENABLE_DATABASE_SEARCH === 'true';
   if (databaseSearchEnabled) {
     try {
-      const atlasQuery = await generateMySQLPrompt(userMessage.content.toString());
+      const atlasQuery = await generateMysqlQuery(userMessage.content.toString());
       const databaseResults = await runGenerateSQLQuery(atlasQuery);
       searchResults.database = databaseResults;
     } catch (error) {

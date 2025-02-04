@@ -1,5 +1,6 @@
 import { openai } from '@ai-sdk/openai';
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
+import { z } from 'zod';
 
 export const createUserElasticSearchPrompt = (elasticsearchResults: string, dbResults: string, userQuery: string) => `
   You are a conversational assistant. Construct a clear and informative response to the user message: "${userQuery}"
@@ -25,87 +26,95 @@ export const createUserElasticSearchPrompt = (elasticsearchResults: string, dbRe
   10. Only provide information that is directly supported by either data source
 `;
 
-export const generateQuery = (message: string) => `
-    You are an expert in generating optimized Elasticsearch queries. Your task is as follows:
-    1. Generate an Elasticsearch query that retrieves the most relevant documents based on the user's message: "${message}".
-    2. Use appropriate field targeting for better accuracy (e.g., "title" for headline searches, "content" for body text).
-    3. If the query requires filtering (e.g., date ranges or tags), include the necessary filters.
-    4. Return only a valid JSON object in the following structure:
-    {
-      "query": {
-        "query_string": {
-          "query": "USER_MESSAGE"
-        }
-      },
-      "sort": [
-        {
-          "@timestamp": {
-            "order": "desc"
-          }
-        }
-      ],
-      "size": N  // optional: specify the number of results if relevant
-    }
-    5. here is an example of a valid query:
-    {
-      "query": {
-        "query_string": {
-          "query": "4952327692024"
-        }
-      },
-      "sort": [
-        {
-          "@timestamp": {
-            "order": "desc"
-          }
-        }
-      ]
-    }
-    4. Sort by relevance using the '@timestamp' field.
-    5. Absolutely no explanations, comments, or text outside the JSON object should be included.
-    
-    Output the JSON query now.
-`;
+export const getElasticsearchResults = async (query: string) => {
+  return fetch('/api/elasticsearch', {
+    method: 'POST',
+    body: query,
+  });
+};
 
-async function getOptimizedQuery(elasticsearchPrompt: string): Promise<string | null> {
+export const generateQueryPrompt = (
+  message: string
+) => ` You are an expert in generating optimized Elasticsearch queries. Your task is as follows: 
+1. Generate an Elasticsearch query that retrieves the most relevant documents based on the user's message: "${message}". 
+2. Extract only the essential keywords from the user's message that directly relate to the content being searched (e.g., "logs," "warnings," "errors"). Ignore filler words (e.g., "show me," "I want to see") as well as words like "visualization" and "dynamic chart" as they are not relevant to the query string.
+3. Include a date range filter using the "@timestamp" field if the user's message contains time-related terms. Interpret these terms and translate them into the appropriate date range. If the user's message does not contain any time-related terms, omit the date range filter.
+4. The JSON structure must strictly follow this format: 
+{ 
+  "query": { 
+    "query_string": { 
+      "query": "EXTRACTED_KEYWORDS" 
+    } 
+  }, 
+  "post_filter": { 
+    "range": { 
+      "@timestamp": { 
+        "gte": "START_DATE", // Replace with actual start date if relevant
+        "lte": "END_DATE"    // Replace with actual end date if relevant
+      } 
+    } 
+  }, 
+  "sort": [ 
+    { 
+      "@timestamp": { 
+        "order": "desc" 
+      } 
+    } 
+  ], 
+  "size": 100
+} 
+5. The "query_string.query" field must contain only the extracted keywords, and no additional fields or properties should be included.
+6. Use "post_filter" for filtering by date range instead of including it in the main query, to ensure results match the query string first before applying the filter.
+7. Ensure that the query structure is valid and strictly adheres to the above format without introducing any extraneous fields or invalid configurations.
+8. Absolutely no explanations, comments, or text outside the JSON object should be included. Only return a valid JSON object as specified above.`;
+
+const ElasticsearchQuerySchema = z.object({
+  query: z.object({
+    query_string: z.object({
+      query: z.string(),
+      fields: z.array(z.string()).optional(),
+    }),
+  }),
+  sort: z
+    .array(
+      z.object({
+        '@timestamp': z.object({
+          order: z.string(),
+        }),
+      })
+    )
+    .optional(),
+  size: z.number().optional(),
+});
+
+type ElasticsearchQuery = z.infer<typeof ElasticsearchQuerySchema>;
+
+async function getOptimizedQuery(elasticsearchPrompt: string): Promise<ElasticsearchQuery | null> {
   try {
-    const { text: optimizedElasticsearchQuery } = await generateText({
+    const response = await generateObject({
       model: openai('gpt-4'),
       prompt: elasticsearchPrompt,
+      schema: ElasticsearchQuerySchema,
     });
-    return optimizedElasticsearchQuery;
+
+    return response.object;
   } catch (error) {
     console.error('Error generating text for Elasticsearch prompt:', error);
     return null;
   }
 }
 
-export type ElasticsearchQuery = {
-  query: {
-    multi_match: {
-      query: string;
-      fields: string[];
-    };
-  };
-  sort: Array<{
-    '@timestamp': {
-      order: 'desc' | 'asc';
-    };
-  }>;
-};
-
-export async function generateElasticsearchPrompt(message: string): Promise<ElasticsearchQuery | null> {
+export async function generateElasticsearchQuery(message: string): Promise<ElasticsearchQuery | null> {
   try {
-    const elasticsearchPrompt = generateQuery(message);
-    const optimizedQuery = await getOptimizedQuery(elasticsearchPrompt);
+    const prompt = generateQueryPrompt(message);
+    const optimizedQuery = await getOptimizedQuery(prompt);
 
     if (!optimizedQuery) {
       console.error('Optimized Elasticsearch query is empty or null.');
       return null;
     }
 
-    const parsedQuery: ElasticsearchQuery = JSON.parse(optimizedQuery);
-    return parsedQuery;
+    return optimizedQuery;
   } catch (error) {
     console.error('Error generating Elasticsearch prompt:', error);
     return null;

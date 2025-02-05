@@ -36,9 +36,9 @@ export async function generateChartConfig(chartData: any, userQuery: string) {
 
       Here is an example complete config:
       {
-      "type": "pie",
+      "type": "bar",
       "xKey": "month",
-      "yKeys": ["sales", "profit", "expenses"],
+      "yKeys": ["log_level", "timestamp", "expenses"],
       "colors": {
         "sales": "#4CAF50",
         "profit": "#2196F3",
@@ -52,20 +52,22 @@ export async function generateChartConfig(chartData: any, userQuery: string) {
 
       Data:
       ${JSON.stringify(chartData, null, 2)}
-      
+
+      Possible y-keys are:
+      ${JSON.stringify(Object.keys(chartData[0]))}
+
       Requirements:
       1. The config MUST include a colors object
-      2. Each yKey MUST have a corresponding color in the colors object
-      3. Colors should be in hex format (e.g. #4CAF50)
-      4. Choose colors that meaningfully represent the data (e.g. red for errors, green for success)
-      5. If no meaningful color association exists, use any appropriate color
-      6. If the xKey makes sense to be time-related, choose the best range (e.g., "month", "year", "day") based on the data provided as the xKey.
-      7. Return a complete JSON object with all required fields including colors.
+      2. Select the appropriate yKeys from the possible y-keys above.
+      3. Each yKey MUST have a corresponding color in the colors object
+      4. Colors should be in hex format (e.g. #4CAF50)
+      5. Choose colors that meaningfully represent the data (e.g. red for errors, green for success)
+      6. If no meaningful color association exists, use any appropriate color
+      7. If the xKey makes sense to be time-related, choose the best range (e.g., "month", "year", "day") based on the data provided as the xKey.
+      8. Return a complete JSON object with all required fields including colors.
       `,
       schema: configSchema,
     });
-
-    console.log('Raw config from AI:', JSON.stringify(config, null, 2));
 
     // Create colors object
     const colors: Record<string, string> = {};
@@ -82,8 +84,6 @@ export async function generateChartConfig(chartData: any, userQuery: string) {
       colors: colors,
       legend: config.legend ?? true,
     };
-
-    console.log('Final config:', JSON.stringify(updatedConfig, null, 2));
 
     return updatedConfig;
   } catch (error) {

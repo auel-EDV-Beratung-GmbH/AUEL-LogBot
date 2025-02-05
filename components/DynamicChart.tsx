@@ -1,21 +1,6 @@
 'use client';
 
-import {
-  Bar,
-  BarChart,
-  Line,
-  LineChart,
-  Area,
-  AreaChart,
-  Pie,
-  PieChart,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Legend,
-  Label,
-} from 'recharts';
+import { Bar, BarChart, XAxis, YAxis, CartesianGrid, Legend, Label } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { ChartConfigFromSchema } from './types/chart';
 import { MinimizedLogData } from '@/lib/tools';
@@ -26,7 +11,6 @@ function toTitleCase(str: string): string {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 }
-
 export function DynamicChart({
   chartData,
   chartConfig,
@@ -37,26 +21,30 @@ export function DynamicChart({
   const renderChart = () => {
     if (!chartData || !chartConfig) return <div>No chart data</div>;
 
-    const groupedKey = 'log_level'; // FIXME: detect this dynamically
-    const groupedLogCounts = chartData.reduce<Record<string, number>[]>((previous, current) => {
-      const countKey = current[groupedKey as keyof typeof current]; // FIXME:
+    const dataOrderedByXKey = Object.groupBy(chartData, (item) => chartConfig.xKey);
 
-      console.log('previous: ', previous);
-      console.log('current: ', current);
+    const data = Object.entries(dataOrderedByXKey).map(([month, items]) => {
+      const counts = items?.reduce<Record<string, number>>((acc, item) => {
+        const key = item[chartConfig.yKeys[0] as keyof typeof item];
+        if (!acc[key]) {
+          acc[key] = 0;
+        }
+        acc[key]++;
+        return acc;
+      }, {});
 
-      if (!Object.keys(previous).includes(countKey)) {
-        return [...previous, { [countKey]: 1 }];
-      }
+      return {
+        [chartConfig.xKey]: month,
+        ...counts,
+      };
+    });
 
-      const increasedCount = previous.find((item) => item.hasOwnProperty(countKey))![countKey] + 1;
-
-      return [...previous, { [countKey]: increasedCount }];
-    }, []);
+    const barKeys = Array.from(new Set(chartData.map((item) => item[chartConfig.yKeys[0] as keyof typeof item])));
 
     switch (chartConfig.type) {
       case 'bar':
         return (
-          <BarChart data={groupedLogCounts}>
+          <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey={chartConfig.xKey}>
               <Label value={toTitleCase(chartConfig.xKey)} offset={0} position="insideBottom" />
@@ -66,7 +54,7 @@ export function DynamicChart({
             </YAxis>
             <ChartTooltip content={<ChartTooltipContent />} />
             {chartConfig.legend && <Legend />}
-            {chartConfig.yKeys.map((key, index) => (
+            {barKeys.map((key, index) => (
               <Bar key={key} dataKey={key} fill={chartConfig.colors[key]} />
             ))}
           </BarChart>

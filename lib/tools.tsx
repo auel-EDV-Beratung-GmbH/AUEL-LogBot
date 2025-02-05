@@ -65,7 +65,7 @@ export const minimizeElasticsearchResponse = (elasticsearchResponse: Elasticsear
     const { log_level, ['@timestamp']: timestampStr, message } = hit._source;
 
     const timestamp = new Date(timestampStr);
-    const day = format(timestamp, 'ddd');
+    const day = format(timestamp, 'EEEE');
     const month = format(timestamp, 'MMM');
     const year = format(timestamp, 'yyy');
 
@@ -122,10 +122,6 @@ export const dynamicallyVisualizeLogs = tool({
   }),
   execute: async (props) => {
     const { logData, userQuery, chartConfig } = props;
-
-    console.log('chart config: ', JSON.stringify(chartConfig));
-    console.log('user query: ', JSON.stringify(userQuery));
-    console.log('log data: ', JSON.stringify(logData));
 
     return logData;
   },
